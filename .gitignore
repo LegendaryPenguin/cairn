@@ -1,0 +1,11 @@
+# Local cluster state produced by scripts/run-cluster.sh and scripts/demo.sh:
+# binaries, per-node data directories, logs, and the CLI's sequence-number file.
+run/
+
+# Benchmark and profile output
+*.prof
+*.test
+cpu.out
+mem.out
+
+.DS_Store
