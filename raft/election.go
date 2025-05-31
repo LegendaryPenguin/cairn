@@ -113,6 +113,14 @@ func (n *Node) solicit(preVote bool) bool {
 	quorum := n.cfg.Quorum()
 	n.mu.Unlock()
 
+	// The self-vote can already be a majority — a single-node cluster is its own
+	// quorum. Checking before fanning out matters because the quorum test below
+	// only runs inside the per-peer goroutines, and with no peers none of them
+	// would ever run.
+	if 1 >= quorum {
+		return true
+	}
+
 	var (
 		wg      sync.WaitGroup
 		vmu     sync.Mutex

@@ -124,6 +124,12 @@ func (n *Node) confirmLeadership(term Term, timeout time.Duration) error {
 		LeaderCommit: commit,
 	}
 
+	// As in solicit: this node alone may already be a majority, and the quorum
+	// check below only runs inside the per-peer goroutines.
+	if 1 >= quorum {
+		return nil
+	}
+
 	var (
 		mu      sync.Mutex
 		acks    = 1 // self
