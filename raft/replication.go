@@ -56,16 +56,19 @@ func (n *Node) runLeader() {
 			continue
 		}
 
+		// Claim the in-flight slot while still holding mu, in the same critical
+		// section that read it. Marking it after the unlock would race with the
+		// completing goroutine's delete, which runs under mu.
 		peers := make([]NodeID, 0, len(n.cfg.Peers))
 		for _, p := range n.cfg.Peers {
 			if p != n.cfg.ID && !inflight[p] {
+				inflight[p] = true
 				peers = append(peers, p)
 			}
 		}
 		n.mu.Unlock()
 
 		for _, p := range peers {
-			inflight[p] = true
 			go func(peer NodeID) {
 				n.replicateTo(peer)
 				n.mu.Lock()
