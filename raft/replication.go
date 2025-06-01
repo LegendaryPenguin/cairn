@@ -40,6 +40,22 @@ func (n *Node) runLeader() {
 			continue
 		}
 
+		// A single-node cluster has no peer whose reply would trigger commit
+		// advancement, so the leader has to do it for itself. Calling this
+		// unconditionally is also correct for larger clusters: it is idempotent
+		// and only ever moves commitIndex forward.
+		n.maybeAdvanceCommitLocked()
+
+		if n.lostQuorumLocked() {
+			// Step down into the current term rather than a higher one: this node
+			// has no evidence anyone has moved on, and inflating the term would
+			// disrupt a healthy leader on the other side of the partition.
+			n.stepDownLocked(n.currentTerm)
+			n.resetElectionTimerLocked()
+			n.mu.Unlock()
+			continue
+		}
+
 		peers := make([]NodeID, 0, len(n.cfg.Peers))
 		for _, p := range n.cfg.Peers {
 			if p != n.cfg.ID && !inflight[p] {
@@ -58,6 +74,26 @@ func (n *Node) runLeader() {
 			}(p)
 		}
 	}
+}
+
+// lostQuorumLocked reports whether a majority of peers has gone silent for
+// longer than one full election timeout.
+//
+// The window is ElectionTimeoutMax rather than the heartbeat interval because a
+// single dropped heartbeat round is normal; what matters is a peer being
+// unreachable for long enough that it would have started its own election.
+func (n *Node) lostQuorumLocked() bool {
+	cutoff := n.clock.Now().Add(-n.cfg.ElectionTimeoutMax)
+	reachable := 1 // self
+	for _, p := range n.cfg.Peers {
+		if p == n.cfg.ID {
+			continue
+		}
+		if t, ok := n.lastContact[p]; ok && t.After(cutoff) {
+			reachable++
+		}
+	}
+	return reachable < n.cfg.Quorum()
 }
 
 // replicateTo sends one AppendEntries (or InstallSnapshot) to a peer and
@@ -127,6 +163,12 @@ func (n *Node) replicateTo(peer NodeID) {
 	if n.role != Leader || n.currentTerm != term {
 		return
 	}
+
+	// Any reply at all proves the peer is reachable, including a rejected one:
+	// a failed consistency check means the log needs repair, not that the peer
+	// is gone. Recording contact only on success would depose a leader whose
+	// followers are all busy being brought up to date.
+	n.lastContact[peer] = n.clock.Now()
 
 	if reply.Term > n.currentTerm {
 		n.stepDownLocked(reply.Term)
@@ -419,6 +461,7 @@ func (n *Node) sendSnapshot(peer NodeID, term Term) {
 	if n.role != Leader || n.currentTerm != term {
 		return
 	}
+	n.lastContact[peer] = n.clock.Now()
 	if reply.Term > n.currentTerm {
 		n.stepDownLocked(reply.Term)
 		n.persistLocked()

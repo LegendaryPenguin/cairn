@@ -50,6 +50,15 @@ type Node struct {
 	nextIndex  map[NodeID]Index
 	matchIndex map[NodeID]Index
 
+	// lastContact records when each peer last answered an RPC. A leader that
+	// cannot reach a majority within one election timeout steps down, rather
+	// than sitting in a partition believing it still leads. Plain Raft does not
+	// require this — safety holds without it because such a leader cannot commit
+	// anything — but without it a partitioned leader keeps answering status
+	// queries as leader and keeps rejecting client writes with a redirect to
+	// itself, which is indistinguishable from a hung cluster.
+	lastContact map[NodeID]time.Time
+
 	// pending maps a log index to the client waiting on it. A leader answers a
 	// write only once that exact index commits AND the entry there still has
 	// the term the leader appended it with — if it does not, the entry was
@@ -113,6 +122,7 @@ func NewNode(cfg Config, store Storage, sm StateMachine, trans Transport) (*Node
 		role:        Follower,
 		nextIndex:   make(map[NodeID]Index),
 		matchIndex:  make(map[NodeID]Index),
+		lastContact: make(map[NodeID]time.Time),
 		pending:     make(map[Index]*pendingWrite),
 		applyCh:     make(chan struct{}, 1),
 		replicateCh: make(chan struct{}, 1),
@@ -265,6 +275,15 @@ func (n *Node) becomeLeaderLocked() {
 		n.matchIndex[p] = 0
 	}
 	n.matchIndex[n.cfg.ID] = last
+
+	// Start every peer's contact clock at election time. Without this a new
+	// leader would immediately look like it had lost quorum, since no peer has
+	// answered it yet, and check-quorum would depose it before its first
+	// heartbeat round completed.
+	now := n.clock.Now()
+	for _, p := range n.cfg.Peers {
+		n.lastContact[p] = now
+	}
 	n.notifyRole()
 
 	// Append a no-op of the new term. Without it a leader that inherits
