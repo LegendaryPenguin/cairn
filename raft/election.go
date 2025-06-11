@@ -204,6 +204,18 @@ func (n *Node) HandleRequestVote(args *RequestVoteArgs) *RequestVoteReply {
 	// hypothetical, and recording a vote for it would consume this node's one
 	// real vote for a term nobody has entered.
 	if args.PreVote {
+		// A leader never grants a pre-vote. It has a quorum by definition, so
+		// there is nothing to replace, and it must not help unseat itself.
+		//
+		// This case is not covered by the election-deadline check below: a leader
+		// does not arm its own election timer, so its deadline sits permanently
+		// in the past and reads as "no live leader". Without this branch, the
+		// one node that is certain a leader exists is the one most willing to
+		// vote against it.
+		if n.role == Leader {
+			return reply
+		}
+
 		lastIdx := n.store.LastIndex()
 		lastTerm, err := n.store.Term(lastIdx)
 		if err != nil {

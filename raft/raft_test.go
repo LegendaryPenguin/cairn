@@ -322,6 +322,27 @@ func TestPreVoteDoesNotConsumeTheRealVote(t *testing.T) {
 	}
 }
 
+func TestLeaderNeverGrantsAPreVote(t *testing.T) {
+	m := newMemStore()
+	n, _ := testNode(t, "a", []NodeID{"a", "b", "c"}, m)
+
+	n.mu.Lock()
+	n.currentTerm = 3
+	n.becomeLeaderLocked()
+	n.mu.Unlock()
+
+	// A leader does not arm its own election timer, so its deadline sits in the
+	// past and the "no live leader" heuristic would otherwise read as true —
+	// making the one node that is certain a leader exists the most willing to
+	// vote against it.
+	r := n.HandleRequestVote(&RequestVoteArgs{
+		Term: 4, CandidateID: "b", LastLogIndex: 99, LastLogTerm: 9, PreVote: true,
+	})
+	if r.VoteGranted {
+		t.Fatal("a leader granted a pre-vote, which lets a rejoining follower unseat it")
+	}
+}
+
 // --- log reconciliation ---
 
 func TestAppendEntriesRejectsMissingPrefix(t *testing.T) {
