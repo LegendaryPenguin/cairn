@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 736" width="900" height="736" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <rect width="900" height="736" rx="8" fill="#0f1115"/>
+  <rect width="900" height="30" rx="8" fill="#1b1f27"/>
+  <rect y="22" width="900" height="8" fill="#1b1f27"/>
+  <circle cx="20" cy="15" r="5" fill="#e06c62"/>
+  <circle cx="38" cy="15" r="5" fill="#d8a657"/>
+  <circle cx="56" cy="15" r="5" fill="#7cb87c"/>
+  <text x="450" y="19" fill="#6f7d94" font-size="11" text-anchor="middle">scripts/demo.sh — cairn</text>
+
+  <g font-size="11.5">
+    <text x="18" y="54" fill="#7cb87c">$</text><text x="34" y="54" fill="#e6e9ef">./scripts/demo.sh</text>
+
+    <text x="18" y="80" fill="#5eb0ef">== Step 1: start three nodes with empty logs</text>
+    <text x="18" y="96" fill="#6f7d94">  proving: three independent processes with their own WALs form one cluster</text>
+    <text x="18" y="116" fill="#cdd6e3">  n1: consensus 127.0.0.1:7001  client http://127.0.0.1:8001  pid 87832</text>
+    <text x="18" y="132" fill="#cdd6e3">  n2: consensus 127.0.0.1:7002  client http://127.0.0.1:8002  pid 87835</text>
+    <text x="18" y="148" fill="#cdd6e3">  n3: consensus 127.0.0.1:7003  client http://127.0.0.1:8003  pid 87838</text>
+
+    <text x="18" y="176" fill="#5eb0ef">== Step 2: wait for an election</text>
+    <text x="18" y="192" fill="#6f7d94">  proving: exactly one of the three becomes leader, and all three agree who it is</text>
+    <text x="18" y="212" fill="#7cb87c">  leader: n1</text>
+    <text x="18" y="228" fill="#cdd6e3">  n1 reports: role=leader   term=1 leader=n1</text>
+    <text x="18" y="244" fill="#cdd6e3">  n2 reports: role=follower term=1 leader=n1</text>
+    <text x="18" y="260" fill="#cdd6e3">  n3 reports: role=follower term=1 leader=n1</text>
+    <text x="18" y="280" fill="#6f7d94">  role transitions logged by the nodes themselves, oldest first:</text>
+    <text x="18" y="296" fill="#8b9bb4">    [n1] 14:40:48.014125 role=candidate term=1</text>
+    <text x="18" y="312" fill="#8b9bb4">    [n3] 14:40:48.031390 role=follower  term=1</text>
+    <text x="18" y="328" fill="#8b9bb4">    [n2] 14:40:48.031515 role=follower  term=1</text>
+    <text x="18" y="344" fill="#8b9bb4">    [n1] 14:40:48.060649 role=leader    term=1</text>
+
+    <text x="18" y="372" fill="#5eb0ef">== Step 3: write through the client API</text>
+    <text x="18" y="392" fill="#cdd6e3">  put mountain (seq 1)</text>
+    <text x="18" y="408" fill="#cdd6e3">  put summit (seq 2)</text>
+    <text x="18" y="424" fill="#cdd6e3">  cas flag succeeded (seq 3)</text>
+
+    <text x="18" y="452" fill="#5eb0ef">== Step 4: read it back</text>
+    <text x="18" y="472" fill="#cdd6e3">  mountain = cairn   (linearizable read)</text>
+    <text x="18" y="488" fill="#cdd6e3">  summit   = 2043m   (linearizable read)</text>
+    <text x="18" y="504" fill="#cdd6e3">  flag     = raised  (linearizable read)</text>
+
+    <text x="18" y="532" fill="#5eb0ef">== Step 5: kill the leader</text>
+    <text x="18" y="548" fill="#6f7d94">  proving: losing the leader does not lose committed data</text>
+    <text x="18" y="568" fill="#e06c62">  killing n1 (pid 87832) with SIGKILL, so it gets no chance to hand over</text>
+    <text x="18" y="588" fill="#7cb87c">  new leader: n2 (was n1)</text>
+    <text x="18" y="604" fill="#8b9bb4">    [n2] 14:40:48.919806 role=candidate term=2</text>
+    <text x="18" y="620" fill="#8b9bb4">    [n3] 14:40:48.956699 role=follower  term=2</text>
+    <text x="18" y="636" fill="#8b9bb4">    [n2] 14:40:48.977753 role=leader    term=2</text>
+
+    <text x="18" y="664" fill="#5eb0ef">== Step 6: read the value back from the new leadership</text>
+    <text x="18" y="684" fill="#7cb87c">  mountain = cairn   (linearizable read)   ← committed before the kill, intact after</text>
+
+    <text x="18" y="712" fill="#5eb0ef">== Demo complete</text>
+    <text x="18" y="728" fill="#6f7d94">  elected a leader, committed writes, killed the leader, elected another,</text>
+  </g>
+</svg>
