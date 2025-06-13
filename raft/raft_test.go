@@ -804,6 +804,29 @@ func TestSubmitOnFollowerRedirects(t *testing.T) {
 	}
 }
 
+func TestStoppedNodeRefusesRPCsInsteadOfPanicking(t *testing.T) {
+	m := newMemStore()
+	n, _ := testNode(t, "a", []NodeID{"a", "b", "c"}, m)
+	n.Start()
+	n.Stop()
+
+	// A peer mid-call does not know this node has shut down, and the node's
+	// storage may already be closed. Serving the append would reach the durable
+	// write, which treats failure as unrecoverable and panics. All three
+	// handlers must decline instead.
+	if r := n.HandleAppendEntries(&AppendEntriesArgs{
+		Term: 5, LeaderID: "b", Entries: []LogEntry{{Index: 1, Term: 5}},
+	}); r.Success {
+		t.Fatal("a stopped node accepted an append")
+	}
+	if r := n.HandleRequestVote(&RequestVoteArgs{Term: 5, CandidateID: "b"}); r.VoteGranted {
+		t.Fatal("a stopped node granted a vote")
+	}
+	n.HandleInstallSnapshot(&InstallSnapshotArgs{
+		Term: 5, LeaderID: "b", LastIncludedIndex: 9, LastIncludedTerm: 5,
+	})
+}
+
 // --- config validation ---
 
 func TestConfigRejectsTimeoutsThatUnseatHealthyLeaders(t *testing.T) {

@@ -195,6 +195,10 @@ func (n *Node) solicit(preVote bool) bool {
 
 // HandleRequestVote implements the voter's side.
 func (n *Node) HandleRequestVote(args *RequestVoteArgs) *RequestVoteReply {
+	if n.isStopped() {
+		return &RequestVoteReply{}
+	}
+
 	n.mu.Lock()
 	defer n.mu.Unlock()
 

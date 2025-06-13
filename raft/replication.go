@@ -289,6 +289,10 @@ func (n *Node) maybeAdvanceCommitLocked() {
 
 // HandleAppendEntries implements the follower's side of replication.
 func (n *Node) HandleAppendEntries(args *AppendEntriesArgs) *AppendEntriesReply {
+	if n.isStopped() {
+		return &AppendEntriesReply{}
+	}
+
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -480,6 +484,10 @@ func (n *Node) sendSnapshot(peer NodeID, term Term) {
 
 // HandleInstallSnapshot replaces this node's state with the leader's snapshot.
 func (n *Node) HandleInstallSnapshot(args *InstallSnapshotArgs) *InstallSnapshotReply {
+	if n.isStopped() {
+		return &InstallSnapshotReply{}
+	}
+
 	n.mu.Lock()
 	defer n.mu.Unlock()
 

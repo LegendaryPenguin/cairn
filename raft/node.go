@@ -343,6 +343,23 @@ func (n *Node) notifyRole() {
 	}
 }
 
+// isStopped reports whether Stop has been called.
+//
+// The RPC handlers check this because a transport can still deliver to a node
+// that has shut down — a peer mid-call does not know, and in tests a switchboard
+// may still hold a registration. Serving such a call is not merely wasteful: the
+// node's storage may already be closed, and the durable append in
+// HandleAppendEntries treats a write failure as unrecoverable and panics.
+// Refusing early turns a crash into an ordinary unreachable peer.
+func (n *Node) isStopped() bool {
+	select {
+	case <-n.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
 func (n *Node) signalApply() {
 	select {
 	case n.applyCh <- struct{}{}:
